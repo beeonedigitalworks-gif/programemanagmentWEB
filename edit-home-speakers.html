@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Edit Home Speakers - Admin</title>
+  <link rel="stylesheet" href="css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <script src="js/localstorage-sync.js" defer></script>
+  <style>
+    body{padding:24px;background:#f7f9fb}
+    .speaker-card{background:#fff;border-radius:8px;padding:12px;margin-bottom:12px;box-shadow:0 6px 18px rgba(0,0,0,0.04)}
+    .speaker-card img{width:84px;height:84px;object-fit:cover;border-radius:8px}
+    .controls{display:flex;gap:8px}
+    .top-actions{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Edit Home Speakers</h2>
+    <p class="text-muted">Manage the speakers shown on the public Speakers page. Changes are saved to localStorage under <strong>eventalk_speakers</strong>.</p>
+
+    <div class="top-actions">
+      <button id="btn-add" class="btn btn-primary">Add Speaker</button>
+      <button id="btn-save" class="btn btn-success">Save All</button>
+      <button id="btn-export" class="btn btn-outline-secondary">Export JSON</button>
+      <input id="import-file" type="file" accept="application/json" style="display:none">
+      <button id="btn-import" class="btn btn-outline-secondary">Import JSON</button>
+    </div>
+
+    <div id="list"></div>
+  </div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'eventalk_speakers';
+  function safeParse(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY))||[] }catch(e){return[]} }
+  function saveAll(arr){ localStorage.setItem(STORAGE_KEY, JSON.stringify(arr)); }
+  function render(){
+    const list = document.getElementById('list'); list.innerHTML='';
+    const arr = safeParse();
+    arr.forEach((s,i)=>{
+      const div = document.createElement('div'); div.className='speaker-card row align-items-center';
+      div.innerHTML = `
+        <div class="col-auto">
+          <img src="${s.image||'images/speaker-1.jpg'}" alt="img">
+        </div>
+        <div class="col">
+          <div class="form-group"><label>Name</label><input class="form-control name" value="${escapeHtml(s.name||'')}"></div>
+          <div class="form-group"><label>Position</label><input class="form-control position" value="${escapeHtml(s.position||'')}"></div>
+          <div class="form-row">
+            <div class="col"><input class="form-control twitter" placeholder="Twitter URL" value="${escapeHtml(s.twitter||'')}"></div>
+            <div class="col"><input class="form-control facebook" placeholder="Facebook URL" value="${escapeHtml(s.facebook||'')}"></div>
+            <div class="col"><input class="form-control instagram" placeholder="Instagram URL" value="${escapeHtml(s.instagram||'')}"></div>
+          </div>
+        </div>
+        <div class="col-auto text-right">
+          <div class="controls">
+            <label class="btn btn-sm btn-light">Image<input type="file" accept="image/*" class="d-none imgfile"></label>
+            <button class="btn btn-sm btn-danger btn-remove">Remove</button>
+          </div>
+        </div>
+      `;
+      // bind actions
+      div.querySelector('.btn-remove').addEventListener('click', ()=>{ arr.splice(i,1); saveAll(arr); render(); });
+      const imgInput = div.querySelector('.imgfile');
+      imgInput.addEventListener('change', e=>{
+        const f = e.target.files[0]; if(!f) return; const reader=new FileReader(); reader.onload = function(ev){ arr[i].image = ev.target.result; saveAll(arr); render(); }; reader.readAsDataURL(f);
+      });
+      // inputs update on blur
+      ['name','position','twitter','facebook','instagram'].forEach(cls=>{
+        div.querySelector('.'+cls).addEventListener('change', e=>{ arr[i][cls] = e.target.value; saveAll(arr); });
+      });
+      list.appendChild(div);
+    });
+    if(arr.length===0) list.innerHTML = '<div class="alert alert-info">No speakers defined. Click "Add Speaker" to create one.</div>';
+  }
+  function escapeHtml(str){ return (''+str).replace(/[&<>\"']/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;" })[c]); }
+  document.getElementById('btn-add').addEventListener('click', ()=>{
+    const arr = safeParse(); arr.push({name:'New Speaker', position:'Position', image:'', twitter:'', facebook:'', instagram:''}); saveAll(arr); render();
+  });
+  document.getElementById('btn-save').addEventListener('click', ()=>{ alert('Saved to localStorage'); });
+  document.getElementById('btn-export').addEventListener('click', ()=>{
+    const data = JSON.stringify(safeParse(), null, 2); const blob = new Blob([data], {type:'application/json'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='eventalk_speakers.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  });
+  document.getElementById('btn-import').addEventListener('click', ()=>{ document.getElementById('import-file').click(); });
+  document.getElementById('import-file').addEventListener('change', e=>{
+    const f=e.target.files[0]; if(!f) return; const reader=new FileReader(); reader.onload=function(ev){ try{ const parsed=JSON.parse(ev.target.result); if(Array.isArray(parsed)){ saveAll(parsed); render(); alert('Imported'); }else alert('JSON must be an array'); }catch(err){ alert('Invalid JSON'); } }; reader.readAsText(f);
+  });
+  // initial render
+  if(!localStorage.getItem(STORAGE_KEY)){
+    // seed with current template speakers (optional)
+    const seed = [
+      {name:'John Adams',position:'Web Developer',image:'images/speaker-1.jpg',twitter:'',facebook:'',instagram:''},
+      {name:'Jane Doe',position:'UI Designer',image:'images/speaker-2.jpg',twitter:'',facebook:'',instagram:''}
+    ];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
+  }
+  render();
+})();
+</script>
+</body>
+</html>
